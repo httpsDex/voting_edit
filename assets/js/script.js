@@ -42,7 +42,7 @@ function selectCandidate(position, candidateId) {
     }
     
     // Check the radio button
-    const radio = document.getElementById(candidateId);
+    const radio = document.getElementById('candidate_' + candidateId);
     if (radio) {
         radio.checked = true;
     }
@@ -50,7 +50,8 @@ function selectCandidate(position, candidateId) {
     updateSubmitButtonState();
 }
 
-function selectSenator(candidateId) {
+// FIXED: Now properly handles the senator selection with max limit
+function selectSenator(candidateId, maxSelections) {
     const checkbox = document.getElementById(candidateId);
     const card = checkbox ? checkbox.closest('.senator-card') : null;
     
@@ -63,12 +64,12 @@ function selectSenator(candidateId) {
         selectedSenators = selectedSenators.filter(id => id !== candidateId);
     } else {
         // Select if under limit
-        if (selectedSenators.length < 4) {
+        if (selectedSenators.length < maxSelections) {
             checkbox.checked = true;
             card.classList.add('selected');
             selectedSenators.push(candidateId);
         } else {
-            alert('You can only select up to 4 senators.');
+            alert('You can only select up to ' + maxSelections + ' senators.');
         }
     }
     
@@ -79,7 +80,8 @@ function selectSenator(candidateId) {
 function updateSenatorSelectionCount() {
     const countElement = document.getElementById('senatorSelectionCount');
     if (countElement) {
-        countElement.textContent = `${selectedSenators.length}/4 selected`;
+        const maxSelections = countElement.textContent.split('/')[1].split(' ')[0];
+        countElement.textContent = `${selectedSenators.length}/${maxSelections} selected`;
     }
 }
 
@@ -89,7 +91,7 @@ function updateSubmitButtonState() {
     
     // Check if all required positions have selections
     const presidentSelected = document.querySelector('input[name="president"]:checked');
-    const vpSelected = document.querySelector('input[name="vicePresident"]:checked');
+    const vpSelected = document.querySelector('input[name="vice_president"]:checked');
     const secretarySelected = document.querySelector('input[name="secretary"]:checked');
     const treasurerSelected = document.querySelector('input[name="treasurer"]:checked');
     const auditorSelected = document.querySelector('input[name="auditor"]:checked');

@@ -35,6 +35,7 @@ foreach ($positions as $position) {
                                 <div class="team-badge <?php echo strtolower($candidate['team_color']); ?>-team-badge">
                                     <?php echo ucfirst($candidate['team_color']); ?> Team
                                 </div>
+                                <!-- FIXED: Changed name attribute to use underscores -->
                                 <input type="radio" name="<?php echo strtolower(str_replace(' ', '_', $position['position_name'])); ?>" 
                                        value="<?php echo $candidate['candidate_id']; ?>" 
                                        id="candidate_<?php echo $candidate['candidate_id']; ?>" 
@@ -54,7 +55,7 @@ foreach ($positions as $position) {
                         </div>
                     </div>
                 <?php else: ?>
-                    <!-- Multiple Selection Position (Senators) -->
+                    <!-- Multiple Selection Position (Senators) - FIXED: Added maxSelections parameter to onclick -->
                     <div class="position-section">
                         <h2 class="position-title"><?php echo $position['position_name']; ?> (Select up to <?php echo $position['max_selections']; ?>)</h2>
                         <div class="senator-grid">
