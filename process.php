@@ -6,7 +6,7 @@ $election = new Election();
 $current_election = $election->getCurrentElection();
 $election_id = $current_election['election_id'];
 
-// VOTER LOGIN - Now uses voter_id instead of student_id
+// VOTER LOGIN
 if (isset($_POST['login'])) {
     $voter_id = strtoupper(trim($_POST['voter_id']));
     $department_id = $_POST['department_id'];
@@ -35,7 +35,7 @@ if (isset($_POST['login'])) {
     exit;
 }
 
-// SUBMIT VOTE
+// SUBMIT VOTE - FIXED with receipt generation
 if (isset($_POST['submit_vote'])) {
     if (!isset($_SESSION['voter_id'])) {
         header('Location: index.php?screen=login');
@@ -63,19 +63,25 @@ if (isset($_POST['submit_vote'])) {
         exit;
     }
     
-    // If allowing vote changes, delete existing voter record (cascades to votes if set up)
+    // If allowing vote changes, delete existing voter record
     if ($voter_check->hasVoted() && $settings['allow_vote_changes']) {
         $voter_check->deleteVotesByVoter();
     }
     
     // Save votes for single positions
     $single_positions = ['president', 'vice_president', 'secretary', 'treasurer', 'auditor'];
+    $voted_candidates = []; // Store for receipt
+    
     foreach ($single_positions as $position_key) {
         if (isset($_POST[$position_key])) {
             $candidate_id = $_POST[$position_key];
             
-            // Get position_id from candidate
-            $sql = "SELECT position_id FROM candidates WHERE candidate_id = ?";
+            // Get position_id and candidate name from candidate
+            $sql = "SELECT c.position_id, p.position_name, CONCAT(s.first_name, ' ', s.last_name) as candidate_name 
+                    FROM candidates c 
+                    JOIN positions p ON c.position_id = p.position_id
+                    JOIN students s ON c.student_id = s.student_id
+                    WHERE c.candidate_id = ?";
             $stmt = $voter_check->connect()->prepare($sql);
             $stmt->bind_param("i", $candidate_id);
             $stmt->execute();
@@ -85,13 +91,21 @@ if (isset($_POST['submit_vote'])) {
             
             $vote = new Election('', $election_id, $voter_id, $department_id, $position_data['position_id'], $candidate_id);
             $vote->saveVote();
+            
+            // Store for receipt
+            $voted_candidates[$position_data['position_name']] = $position_data['candidate_name'];
         }
     }
     
     // Save senator votes
     if (isset($_POST['senator']) && is_array($_POST['senator'])) {
+        $senator_names = [];
         foreach ($_POST['senator'] as $candidate_id) {
-            $sql = "SELECT position_id FROM candidates WHERE candidate_id = ?";
+            $sql = "SELECT c.position_id, p.position_name, CONCAT(s.first_name, ' ', s.last_name) as candidate_name 
+                    FROM candidates c 
+                    JOIN positions p ON c.position_id = p.position_id
+                    JOIN students s ON c.student_id = s.student_id
+                    WHERE c.candidate_id = ?";
             $stmt = $voter_check->connect()->prepare($sql);
             $stmt->bind_param("i", $candidate_id);
             $stmt->execute();
@@ -101,18 +115,37 @@ if (isset($_POST['submit_vote'])) {
             
             $vote = new Election('', $election_id, $voter_id, $department_id, $position_data['position_id'], $candidate_id);
             $vote->saveVote();
+            
+            // Store for receipt
+            $senator_names[] = $position_data['candidate_name'];
+        }
+        if (!empty($senator_names)) {
+            $voted_candidates['Senator'] = implode(', ', $senator_names);
         }
     }
     
-    // Register voter
+    // Register voter if not already registered
     if (!$voter_check->hasVoted()) {
         $voter_check->registerVoter();
     }
     
+    // Generate unique receipt code using timestamp + voter_id hash
+    $receipt_code = strtoupper(substr(md5($voter_id . time() . $election_id), 0, 12));
+    $receipt_code = chunk_split($receipt_code, 4, '-'); // Format: XXXX-XXXX-XXXX
+    $receipt_code = rtrim($receipt_code, '-');
+    
+    // Store receipt data in session
+    $_SESSION['vote_receipt'] = [
+        'code' => $receipt_code,
+        'timestamp' => date('Y-m-d H:i:s'),
+        'election_name' => $current_election['election_name'],
+        'votes' => $voted_candidates
+    ];
+    
     unset($_SESSION['voter_id']);
     unset($_SESSION['department_id']);
     $_SESSION['vote_success'] = 'Vote submitted successfully!';
-    header('Location: index.php?screen=results');
+    header('Location: index.php?screen=receipt');
     exit;
 }
 

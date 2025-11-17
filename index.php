@@ -12,13 +12,19 @@ if (!$current_election) {
 $_SESSION['election_id'] = $current_election['election_id'];
 
 $screen = isset($_GET['screen']) ? $_GET['screen'] : 'login';
-$valid_screens = ['login', 'verification', 'ballot', 'results', 'admin'];
+// ADDED: receipt to valid screens
+$valid_screens = ['login', 'verification', 'ballot', 'results', 'receipt', 'admin'];
 
 if (!in_array($screen, $valid_screens)) {
     $screen = 'login';
 }
 
 if ($screen === 'admin' && !isset($_SESSION['admin_logged_in'])) {
+    $screen = 'login';
+}
+
+// ADDED: Protect receipt screen
+if ($screen === 'receipt' && !isset($_SESSION['vote_receipt'])) {
     $screen = 'login';
 }
 ?>
@@ -65,6 +71,9 @@ if ($screen === 'admin' && !isset($_SESSION['admin_logged_in'])) {
                 break;
             case 'results':
                 include 'pages/results.php';
+                break;
+            case 'receipt':
+                include 'pages/receipt.php';
                 break;
             case 'admin':
                 include 'pages/admin.php';
