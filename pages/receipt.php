@@ -37,17 +37,6 @@ $receipt = $_SESSION['vote_receipt'];
                     </div>
                 </div>
                 
-                <div style="background: var(--white-primary); padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                    <h3 style="font-size: 16px; color: var(--maroon-primary); margin-bottom: 15px; border-bottom: 2px solid var(--maroon-light); padding-bottom: 10px;">
-                        Your Votes
-                    </h3>
-                    <?php foreach ($receipt['votes'] as $position => $candidate): ?>
-                    <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--gray-light);">
-                        <span style="font-weight: 600; color: var(--gray-dark);"><?php echo $position; ?>:</span>
-                        <span style="color: var(--text-dark);"><?php echo $candidate; ?></span>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
                 
                 <div style="margin-top: 20px; padding: 15px; background: rgba(255, 193, 7, 0.1); border-left: 4px solid var(--warning-color); border-radius: 5px;">
                     <p style="font-size: 13px; color: var(--gray-dark); margin: 0;">

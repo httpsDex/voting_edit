@@ -5,11 +5,13 @@ include_once 'election.php';
 $election = new Election();
 $current_election = $election->getCurrentElection();
 
-if (!$current_election) {
-    die("No active election found. Please contact administrator.");
+// Only set election_id if there's an active election
+if ($current_election) {
+    $_SESSION['election_id'] = $current_election['election_id'];
+} else {
+    // Handle case where no election is active
+    unset($_SESSION['election_id']);
 }
-
-$_SESSION['election_id'] = $current_election['election_id'];
 
 $screen = isset($_GET['screen']) ? $_GET['screen'] : 'login';
 // ADDED: receipt to valid screens

@@ -4,10 +4,16 @@ include_once 'election.php';
 
 $election = new Election();
 $current_election = $election->getCurrentElection();
-$election_id = $current_election['election_id'];
+$election_id = $current_election ? $current_election['election_id'] : null;
 
 // VOTER LOGIN
 if (isset($_POST['login'])) {
+    if (!$current_election) {
+        $_SESSION['login_error'] = 'No active election found.';
+        header('Location: index.php?screen=login');
+        exit;
+    }
+    
     $voter_id = strtoupper(trim($_POST['voter_id']));
     $department_id = $_POST['department_id'];
     
@@ -35,7 +41,7 @@ if (isset($_POST['login'])) {
     exit;
 }
 
-// SUBMIT VOTE - FIXED with receipt generation
+// SUBMIT VOTE - FIXED SQL queries
 if (isset($_POST['submit_vote'])) {
     if (!isset($_SESSION['voter_id'])) {
         header('Location: index.php?screen=login');
@@ -77,12 +83,13 @@ if (isset($_POST['submit_vote'])) {
             $candidate_id = $_POST[$position_key];
             
             // Get position_id and candidate name from candidate
-            $sql = "SELECT c.position_id, p.position_name, CONCAT(s.first_name, ' ', s.last_name) as candidate_name 
+            // FIXED: Updated SQL query to work with new structure
+            $conn = $voter_check->getConnection();
+            $sql = "SELECT c.position_id, p.position_name, CONCAT(c.first_name, ' ', c.last_name) as candidate_name 
                     FROM candidates c 
                     JOIN positions p ON c.position_id = p.position_id
-                    JOIN students s ON c.student_id = s.student_id
                     WHERE c.candidate_id = ?";
-            $stmt = $voter_check->connect()->prepare($sql);
+            $stmt = $conn->prepare($sql);
             $stmt->bind_param("i", $candidate_id);
             $stmt->execute();
             $result = $stmt->get_result();
@@ -101,12 +108,13 @@ if (isset($_POST['submit_vote'])) {
     if (isset($_POST['senator']) && is_array($_POST['senator'])) {
         $senator_names = [];
         foreach ($_POST['senator'] as $candidate_id) {
-            $sql = "SELECT c.position_id, p.position_name, CONCAT(s.first_name, ' ', s.last_name) as candidate_name 
+            // FIXED: Updated SQL query to work with new structure
+            $conn = $voter_check->getConnection();
+            $sql = "SELECT c.position_id, p.position_name, CONCAT(c.first_name, ' ', c.last_name) as candidate_name 
                     FROM candidates c 
                     JOIN positions p ON c.position_id = p.position_id
-                    JOIN students s ON c.student_id = s.student_id
                     WHERE c.candidate_id = ?";
-            $stmt = $voter_check->connect()->prepare($sql);
+            $stmt = $conn->prepare($sql);
             $stmt->bind_param("i", $candidate_id);
             $stmt->execute();
             $result = $stmt->get_result();
@@ -170,22 +178,25 @@ if (isset($_POST['admin_login'])) {
     }
 }
 
-// ADD CANDIDATE
+// ADD CANDIDATE - UPDATED
 if (isset($_POST['add_candidate'])) {
     if (!isset($_SESSION['admin_logged_in'])) {
         header('Location: index.php?screen=login');
         exit;
     }
     
-    $student_id = trim($_POST['candidate_student_id']);
+    $first_name = trim($_POST['candidate_first_name']);
+    $last_name = trim($_POST['candidate_last_name']);
     $position_id = $_POST['candidate_position'];
     $team_id = $_POST['candidate_team'];
     $bio = trim($_POST['candidate_bio']);
+    $department_id = $_POST['candidate_department'];
     $election_id = $_SESSION['election_id'];
     
     $candidate = new Election('', $election_id, '', '', $position_id, '', $team_id);
     
-    if ($candidate->saveCandidate($bio, $student_id)) {
+    // UPDATED: Use new saveCandidate method
+    if ($candidate->saveCandidate($first_name, $last_name, $bio, $department_id)) {
         $_SESSION['admin_message'] = 'Candidate added successfully!';
     } else {
         $_SESSION['admin_error'] = 'Error adding candidate!';
@@ -209,6 +220,51 @@ if (isset($_POST['delete_candidate'])) {
         $_SESSION['admin_message'] = 'Candidate deleted successfully!';
     } else {
         $_SESSION['admin_error'] = 'Error deleting candidate!';
+    }
+    
+    header('Location: index.php?screen=admin');
+    exit;
+}
+
+// CREATE NEW ELECTION
+if (isset($_POST['create_election'])) {
+    if (!isset($_SESSION['admin_logged_in'])) {
+        header('Location: index.php?screen=login');
+        exit;
+    }
+    
+    $election_name = trim($_POST['election_name']);
+    $election_year = $_POST['election_year'];
+    $start_date = $_POST['start_date'];
+    $end_date = $_POST['end_date'];
+    
+    $election = new Election();
+    
+    if ($election->createElection($election_name, $election_year, $start_date, $end_date)) {
+        $_SESSION['admin_message'] = 'Election created successfully!';
+    } else {
+        $_SESSION['admin_error'] = 'Error creating election!';
+    }
+    
+    header('Location: index.php?screen=admin');
+    exit;
+}
+
+// SET ACTIVE ELECTION
+if (isset($_POST['set_active_election'])) {
+    if (!isset($_SESSION['admin_logged_in'])) {
+        header('Location: index.php?screen=login');
+        exit;
+    }
+    
+    $election_id = $_POST['election_id'];
+    $election = new Election('', $election_id);
+    
+    if ($election->setActiveElection()) {
+        $_SESSION['admin_message'] = 'Active election set successfully!';
+        $_SESSION['election_id'] = $election_id;
+    } else {
+        $_SESSION['admin_error'] = 'Error setting active election!';
     }
     
     header('Location: index.php?screen=admin');

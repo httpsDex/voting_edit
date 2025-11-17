@@ -4,7 +4,7 @@ include_once 'dbh.php';
 class Election extends Dbh {
     public $keyword;
     public $election_id;
-    public $voter_identifier; // Changed from student_id
+    public $voter_identifier;
     public $department_id;
     public $position_id;
     public $candidate_id;
@@ -18,6 +18,55 @@ class Election extends Dbh {
         $this->position_id = $position_id;
         $this->candidate_id = $candidate_id;
         $this->team_id = $team_id;
+    }
+
+    // NEW: Public method to get database connection for external use
+    public function getConnection() {
+        return $this->connect();
+    }
+
+    // NEW: Create new election
+    public function createElection($election_name, $election_year, $start_date, $end_date) {
+        $conn = $this->connect();
+        $sql = "INSERT INTO elections (election_name, election_year, start_date, end_date) VALUES (?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) return false;
+        $stmt->bind_param("siss", $election_name, $election_year, $start_date, $end_date);
+        $result = $stmt->execute();
+        $stmt->close();
+        return $result;
+    }
+
+    // NEW: Set active election
+    public function setActiveElection() {
+        $conn = $this->connect();
+        
+        // First, set all elections to inactive
+        $sql1 = "UPDATE elections SET voting_open = 0, results_visible = 0";
+        $conn->query($sql1);
+        
+        // Then set the selected election as active
+        $sql2 = "UPDATE elections SET voting_open = 1 WHERE election_id = ?";
+        $stmt = $conn->prepare($sql2);
+        if (!$stmt) return false;
+        $stmt->bind_param("i", $this->election_id);
+        $result = $stmt->execute();
+        $stmt->close();
+        return $result;
+    }
+
+    // NEW: Get all elections
+    public function getAllElections() {
+        $conn = $this->connect();
+        $sql = "SELECT * FROM elections ORDER BY election_year DESC, election_id DESC";
+        $result = $conn->query($sql);
+        $elections = [];
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $elections[] = $row;
+            }
+        }
+        return $elections;
     }
 
     // NEW: Check if voter ID is eligible based on eligibility rules
@@ -78,33 +127,6 @@ class Election extends Dbh {
         $stmt = $conn->prepare($sql);
         if (!$stmt) return false;
         $stmt->bind_param("i", $eligibility_id);
-        $result = $stmt->execute();
-        $stmt->close();
-        return $result;
-    }
-
-    // STUDENT METHODS (For candidates only)
-    public function getStudent() {
-        $conn = $this->connect();
-        $sql = "SELECT s.*, d.department_name FROM students s 
-                LEFT JOIN departments d ON s.department_id = d.department_id 
-                WHERE s.student_id = ?";
-        $stmt = $conn->prepare($sql);
-        if (!$stmt) return false;
-        $stmt->bind_param("s", $this->keyword);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $data = $result->num_rows > 0 ? $result->fetch_assoc() : false;
-        $stmt->close();
-        return $data;
-    }
-
-    public function saveStudent($first_name, $last_name) {
-        $conn = $this->connect();
-        $sql = "INSERT INTO students (student_id, first_name, last_name, department_id) VALUES (?, ?, ?, ?)";
-        $stmt = $conn->prepare($sql);
-        if (!$stmt) return false;
-        $stmt->bind_param("sssi", $this->keyword, $first_name, $last_name, $this->department_id);
         $result = $stmt->execute();
         $stmt->close();
         return $result;
@@ -197,17 +219,16 @@ class Election extends Dbh {
         return $teams;
     }
 
-    // CANDIDATE METHODS
+    // CANDIDATE METHODS (SIMPLIFIED - no student dependency)
     public function getAllCandidates() {
         $conn = $this->connect();
-        $sql = "SELECT c.*, s.first_name, s.last_name, p.position_name, t.team_color, d.department_name
+        $sql = "SELECT c.*, p.position_name, t.team_color, d.department_name
                 FROM candidates c
-                JOIN students s ON c.student_id = s.student_id
                 JOIN positions p ON c.position_id = p.position_id
                 JOIN teams t ON c.team_id = t.team_id
-                JOIN departments d ON s.department_id = d.department_id
+                JOIN departments d ON c.department_id = d.department_id
                 WHERE c.election_id = ?
-                ORDER BY p.position_order, s.last_name";
+                ORDER BY p.position_order, c.last_name";
         $stmt = $conn->prepare($sql);
         if (!$stmt) return [];
         $stmt->bind_param("i", $this->election_id);
@@ -223,13 +244,12 @@ class Election extends Dbh {
 
     public function getCandidatesByPosition() {
         $conn = $this->connect();
-        $sql = "SELECT c.*, s.first_name, s.last_name, t.team_color, d.department_name
+        $sql = "SELECT c.*, t.team_color, d.department_name
                 FROM candidates c
-                JOIN students s ON c.student_id = s.student_id
                 JOIN teams t ON c.team_id = t.team_id
-                JOIN departments d ON s.department_id = d.department_id
+                JOIN departments d ON c.department_id = d.department_id
                 WHERE c.election_id = ? AND c.position_id = ?
-                ORDER BY s.last_name";
+                ORDER BY c.last_name";
         $stmt = $conn->prepare($sql);
         if (!$stmt) return [];
         $stmt->bind_param("ii", $this->election_id, $this->position_id);
@@ -243,12 +263,13 @@ class Election extends Dbh {
         return $candidates;
     }
 
-    public function saveCandidate($bio, $student_id) {
+    // UPDATED: Save candidate without student_id dependency
+    public function saveCandidate($first_name, $last_name, $bio, $department_id) {
         $conn = $this->connect();
-        $sql = "INSERT INTO candidates (student_id, election_id, position_id, team_id, bio) VALUES (?, ?, ?, ?, ?)";
+        $sql = "INSERT INTO candidates (first_name, last_name, election_id, position_id, team_id, bio, department_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
         $stmt = $conn->prepare($sql);
         if (!$stmt) return false;
-        $stmt->bind_param("siiis", $student_id, $this->election_id, $this->position_id, $this->team_id, $bio);
+        $stmt->bind_param("ssiiisi", $first_name, $last_name, $this->election_id, $this->position_id, $this->team_id, $bio, $department_id);
         $result = $stmt->execute();
         $stmt->close();
         return $result;
@@ -317,13 +338,12 @@ class Election extends Dbh {
     public function getElectionResults() {
         $conn = $this->connect();
         $sql = "SELECT p.position_name, p.position_order,
-                       CONCAT(s.first_name, ' ', s.last_name) as candidate_name,
+                       CONCAT(c.first_name, ' ', c.last_name) as candidate_name,
                        t.team_color,
                        COUNT(v.vote_id) as vote_count,
                        (SELECT COUNT(DISTINCT vote_id) FROM votes WHERE position_id = p.position_id AND election_id = ?) as total_position_votes
                 FROM positions p
                 LEFT JOIN candidates c ON p.position_id = c.position_id AND c.election_id = ?
-                LEFT JOIN students s ON c.student_id = s.student_id
                 LEFT JOIN teams t ON c.team_id = t.team_id
                 LEFT JOIN votes v ON c.candidate_id = v.candidate_id AND v.election_id = ?
                 GROUP BY p.position_id, c.candidate_id

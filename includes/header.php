@@ -4,7 +4,7 @@
         <div class="logo-container">
             <div class="logo">
                 <div class="logo-placeholder">
-                    UNIVERSITY<br>LOGO
+                    <img src="/assets/images/mseuf_logo.jpg" alt="School Logo" class="logo">
                 </div>
             </div>
         </div>

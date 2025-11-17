@@ -50,7 +50,6 @@ function selectCandidate(position, candidateId) {
     updateSubmitButtonState();
 }
 
-// FIXED: Now properly handles the senator selection with max limit
 function selectSenator(candidateId, maxSelections) {
     const checkbox = document.getElementById(candidateId);
     const card = checkbox ? checkbox.closest('.senator-card') : null;
@@ -89,17 +88,19 @@ function updateSubmitButtonState() {
     const submitBtn = document.getElementById('submitVoteBtn');
     if (!submitBtn) return;
     
-    // Check if all required positions have selections
+    // Check if at least one position has a selection
     const presidentSelected = document.querySelector('input[name="president"]:checked');
     const vpSelected = document.querySelector('input[name="vice_president"]:checked');
     const secretarySelected = document.querySelector('input[name="secretary"]:checked');
     const treasurerSelected = document.querySelector('input[name="treasurer"]:checked');
     const auditorSelected = document.querySelector('input[name="auditor"]:checked');
+    const hasSenatorSelection = selectedSenators.length > 0;
     
-    const allSelected = presidentSelected && vpSelected && secretarySelected && 
-                       treasurerSelected && auditorSelected && selectedSenators.length > 0;
+    // Enable submit button if at least one position is selected
+    const hasAnySelection = presidentSelected || vpSelected || secretarySelected || 
+                           treasurerSelected || auditorSelected || hasSenatorSelection;
     
-    submitBtn.disabled = !allSelected;
+    submitBtn.disabled = !hasAnySelection;
 }
 
 // Initialize when page loads
